@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // NewFloatCounter registers and returns new counter of float64 type with the given name.
@@ -24,14 +26,16 @@ func NewFloatCounter(name string) *FloatCounter {
 //
 // It may be used as a gauge if Add and Sub are called.
 type FloatCounter struct {
-	mu sync.Mutex
-	n  float64
+	mu            sync.Mutex
+	n             float64
+	lastWriteTime int64
 }
 
 // Add adds n to fc.
 func (fc *FloatCounter) Add(n float64) {
 	fc.mu.Lock()
 	fc.n += n
+	fc.lastWriteTime = time.Now().Unix()
 	fc.mu.Unlock()
 }
 
@@ -39,6 +43,7 @@ func (fc *FloatCounter) Add(n float64) {
 func (fc *FloatCounter) Sub(n float64) {
 	fc.mu.Lock()
 	fc.n -= n
+	fc.lastWriteTime = time.Now().Unix()
 	fc.mu.Unlock()
 }
 
@@ -46,6 +51,7 @@ func (fc *FloatCounter) Sub(n float64) {
 func (fc *FloatCounter) Get() float64 {
 	fc.mu.Lock()
 	n := fc.n
+	fc.lastWriteTime = time.Now().Unix()
 	fc.mu.Unlock()
 	return n
 }
@@ -54,6 +60,7 @@ func (fc *FloatCounter) Get() float64 {
 func (fc *FloatCounter) Set(n float64) {
 	fc.mu.Lock()
 	fc.n = n
+	fc.lastWriteTime = time.Now().Unix()
 	fc.mu.Unlock()
 }
 
@@ -61,6 +68,10 @@ func (fc *FloatCounter) Set(n float64) {
 func (fc *FloatCounter) marshalTo(prefix string, w io.Writer) {
 	v := fc.Get()
 	fmt.Fprintf(w, "%s %g\n", prefix, v)
+}
+
+func (c *FloatCounter) getLastWriteTime() int64 {
+	return atomic.LoadInt64(&c.lastWriteTime)
 }
 
 func (fc *FloatCounter) metricType() string {

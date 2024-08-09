@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"sync/atomic"
+	"time"
 )
 
 // NewCounter registers and returns new counter with the given name.
@@ -24,7 +25,8 @@ func NewCounter(name string) *Counter {
 //
 // It may be used as a gauge if Dec and Set are called.
 type Counter struct {
-	n uint64
+	n             uint64
+	lastWriteTime int64
 }
 
 // Inc increments c.
@@ -35,16 +37,19 @@ func (c *Counter) Inc() {
 // Dec decrements c.
 func (c *Counter) Dec() {
 	atomic.AddUint64(&c.n, ^uint64(0))
+	atomic.StoreInt64(&c.lastWriteTime, time.Now().Unix())
 }
 
 // Add adds n to c.
 func (c *Counter) Add(n int) {
 	atomic.AddUint64(&c.n, uint64(n))
+	atomic.StoreInt64(&c.lastWriteTime, time.Now().Unix())
 }
 
 // AddInt64 adds n to c.
 func (c *Counter) AddInt64(n int64) {
 	atomic.AddUint64(&c.n, uint64(n))
+	atomic.StoreInt64(&c.lastWriteTime, time.Now().Unix())
 }
 
 // Get returns the current value for c.
@@ -55,6 +60,11 @@ func (c *Counter) Get() uint64 {
 // Set sets c value to n.
 func (c *Counter) Set(n uint64) {
 	atomic.StoreUint64(&c.n, n)
+	atomic.StoreInt64(&c.lastWriteTime, time.Now().Unix())
+}
+
+func (c *Counter) getLastWriteTime() int64 {
+	return atomic.LoadInt64(&c.lastWriteTime)
 }
 
 // marshalTo marshals c with the given prefix to w.

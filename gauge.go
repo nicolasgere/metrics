@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 	"sync/atomic"
+	"time"
 )
 
 // NewGauge registers and returns gauge with the given name, which calls f to obtain gauge value.
@@ -33,6 +34,10 @@ type Gauge struct {
 
 	// f is a callback, which is called for returning the gauge value.
 	f func() float64
+}
+
+func (c *Gauge) getLastWriteTime() int64 {
+	return time.Now().Unix()
 }
 
 // Get returns the current value for g.

@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -63,6 +64,8 @@ type Histogram struct {
 
 	// sum is the sum of all the values put into Histogram
 	sum float64
+
+	lastWriteTime int64
 }
 
 // Reset resets the given histogram.
@@ -92,6 +95,7 @@ func (h *Histogram) Update(v float64) {
 	}
 	bucketIdx := (math.Log10(v) - e10Min) * bucketsPerDecimal
 	h.mu.Lock()
+	h.lastWriteTime = time.Now().Unix()
 	h.sum += v
 	if bucketIdx < 0 {
 		h.lower++
@@ -128,7 +132,7 @@ func (h *Histogram) Merge(src *Histogram) {
 	h.lower += src.lower
 	h.upper += src.upper
 	h.sum += src.sum
-
+	h.lastWriteTime = time.Now().Unix()
 	for i, dbSrc := range src.decimalBuckets {
 		if dbSrc == nil {
 			continue
@@ -263,6 +267,10 @@ func (h *Histogram) getSum() float64 {
 	sum := h.sum
 	h.mu.Unlock()
 	return sum
+}
+
+func (c *Histogram) getLastWriteTime() int64 {
+	return atomic.LoadInt64(&c.lastWriteTime)
 }
 
 func (h *Histogram) metricType() string {

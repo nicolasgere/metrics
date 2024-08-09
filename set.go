@@ -23,6 +23,12 @@ type Set struct {
 	metricsWriters []func(w io.Writer)
 }
 
+var METRIC_TTL *time.Duration = nil
+
+func SetMetricTTL(ttl time.Duration) {
+	METRIC_TTL = &ttl
+}
+
 // NewSet creates new set of metrics.
 //
 // Pass the set to RegisterSet() function in order to export its metrics via global WritePrometheus() call.
@@ -52,6 +58,9 @@ func (s *Set) WritePrometheus(w io.Writer) {
 
 	prevMetricFamily := ""
 	for _, nm := range sa {
+		if METRIC_TTL != nil && nm.metric.getLastWriteTime() < time.Now().Add(-*METRIC_TTL).Unix() {
+			s.UnregisterMetric(nm.name)
+		}
 		metricFamily := getMetricFamily(nm.name)
 		if metricFamily != prevMetricFamily {
 			// write meta info only once per metric family

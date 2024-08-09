@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/valyala/histogram"
@@ -29,6 +30,8 @@ type Summary struct {
 	count uint64
 
 	window time.Duration
+
+	lastWriteTime int64
 }
 
 // NewSummary creates and returns new summary with the given name.
@@ -187,8 +190,13 @@ func isEqualQuantiles(a, b []float64) bool {
 }
 
 type quantileValue struct {
-	sm  *Summary
-	idx int
+	sm            *Summary
+	idx           int
+	lastWriteTime int64
+}
+
+func (qv *quantileValue) getLastWriteTime() int64 {
+	return time.Now().Unix()
 }
 
 func (qv *quantileValue) marshalTo(prefix string, w io.Writer) {
@@ -209,6 +217,10 @@ func addTag(name, tag string) string {
 		return fmt.Sprintf("%s{%s}", name, tag)
 	}
 	return fmt.Sprintf("%s,%s}", name[:len(name)-1], tag)
+}
+
+func (c *Summary) getLastWriteTime() int64 {
+	return atomic.LoadInt64(&c.lastWriteTime)
 }
 
 func registerSummaryLocked(sm *Summary) {
